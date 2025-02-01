@@ -16,10 +16,3 @@ A simple weather forecast web application that allows users to check the weather
 - **JavaScript**: For fetching API data and handling dynamic interactions.
 
 
-## Setup Instructions
-
-### 1. Clone the Repository
-Clone this repository to your local machine using:
-
-```bash
-git clone https://github.com/your-username/weather-app-forecast.git
