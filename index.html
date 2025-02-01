@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather Forecast Application</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom styles for fine-tuned responsiveness and enhanced design */
+    body {
+      background: linear-gradient(to bottom right, #f8fafc, #e2e8f0);
+      color: #2d3748;
+      font-family: 'Arial', sans-serif;
+    }
+
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 1rem;
+      box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.1);
+    }
+
+    button {
+      transition: all 0.3s ease;
+    }
+
+    button:hover {
+      transform: translateY(-3px);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex justify-center items-center">
+  <div class="container w-full max-w-md p-6">
+    <h1 class="text-3xl font-bold mb-4 text-center text-gray-800">Weather Forecast</h1>
+
+    <!-- Search Section -->
+    <div class="mb-4">
+      <input id="city-input" type="text" placeholder="Enter city name" 
+        class="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-800">
+      <button id="search-btn" 
+        class="w-full mt-2 bg-blue-500 text-white font-bold p-2 rounded-md hover:bg-blue-600">Get Weather</button>
+    </div>
+
+    <!-- Current Location Search Button -->
+    <button id="location-btn" 
+      class="w-full bg-green-500 text-white font-bold p-2 rounded-md hover:bg-green-600 mb-4">Get Weather for Current Location</button>
+
+    <!-- Dropdown for Recent Cities -->
+    <div class="mb-4 hidden" id="recent-cities-dropdown">
+      <label for="recent-cities" class="block mb-2 text-gray-800">Recently Searched Cities:</label>
+      <select id="recent-cities" class="w-full p-2 border rounded-md text-gray-800">
+        <option value="">Select a city</option>
+      </select>
+    </div>
+
+    <!-- Weather Information Display -->
+    <div id="weather-info" class="hidden mt-4 p-4 bg-blue-100 rounded-md">
+      <h2 id="location" class="text-lg font-bold text-blue-700"></h2>
+      <p id="temperature" class="text-xl text-blue-800"></p>
+      <p id="weather-description" class="text-gray-800"></p>
+    </div>
+
+    <!-- Extended Forecast Section -->
+    <div id="forecast-info" class="hidden mt-4 p-4 bg-gray-100 rounded-md">
+      <h3 class="text-lg font-bold mb-2 text-gray-800">5-Day Weather Forecast</h3>
+      <div id="forecast-container" class="grid grid-cols-1 gap-2"></div>
+    </div>
+
+    <!-- Error Section -->
+    <div id="error-message" class="hidden text-red-500 mt-4"></div>
+  </div>
+
+  <script>
+    const apiKey = "f95d7536aa2943cfa3e75136250102"; // Using provided Weather API key
+    const searchBtn = document.getElementById("search-btn");
+    const locationBtn = document.getElementById("location-btn");
+    const cityInput = document.getElementById("city-input");
+    const weatherInfo = document.getElementById("weather-info");
+    const locationEl = document.getElementById("location");
+    const temperatureEl = document.getElementById("temperature");
+    const weatherDescriptionEl = document.getElementById("weather-description");
+    const forecastInfo = document.getElementById("forecast-info");
+    const forecastContainer = document.getElementById("forecast-container");
+    const errorMessage = document.getElementById("error-message");
+    const recentCitiesDropdown = document.getElementById("recent-cities-dropdown");
+    const recentCitiesSelect = document.getElementById("recent-cities");
+    const RECENT_CITIES_KEY = "recentCities";
+
+    // Event listener for search by city name
+    searchBtn.addEventListener("click", () => searchWeather(cityInput.value.trim()));
+
+    // Event listener for current location weather
+    locationBtn.addEventListener("click", () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          position => {
+            const { latitude, longitude } = position.coords;
+            searchWeather(`${latitude},${longitude}`);
+          },
+          () => displayError("Unable to get your location."));
+      } else {
+        displayError("Geolocation is not supported by this browser.");
+      }
+    });
+
+    // Event listener for selecting recent cities
+    recentCitiesSelect.addEventListener("change", () => {
+      const selectedCity = recentCitiesSelect.value;
+      if (selectedCity) searchWeather(selectedCity);
+    });
+
+    async function searchWeather(location) {
+      if (!location) {
+        displayError("Please enter a city name or use current location.");
+        return;
+      }
+
+      try {
+        const currentWeatherResponse = await fetch(`http://api.weatherapi.com/v1/current.json?key=${apiKey}&q=${location}&aqi=yes`);
+        const forecastResponse = await fetch(`http://api.weatherapi.com/v1/forecast.json?key=${apiKey}&q=${location}&days=5`);
+
+        if (!currentWeatherResponse.ok || !forecastResponse.ok) {
+          throw new Error("City not found or API error.");
+        }
+
+        const weatherData = await currentWeatherResponse.json();
+        const forecastData = await forecastResponse.json();
+        displayWeatherInfo(weatherData);
+        displayExtendedForecast(forecastData);
+        saveRecentCity(location);
+      } catch (error) {
+        displayError(error.message);
+      }
+    }
+
+    function displayWeatherInfo(data) {
+      errorMessage.classList.add("hidden");
+      weatherInfo.classList.remove("hidden");
+      locationEl.textContent = `${data.location.name}, ${data.location.country}`;
+      temperatureEl.textContent = `Temperature: ${data.current.temp_c} °C`;
+      weatherDescriptionEl.textContent = `Condition: ${data.current.condition.text}`;
+    }
+
+    function displayExtendedForecast(data) {
+      forecastContainer.innerHTML = "";
+      forecastInfo.classList.remove("hidden");
+
+      data.forecast.forecastday.forEach(day => {
+        const date = day.date;
+        const icon = day.day.condition.icon;
+        const temp = `${day.day.avgtemp_c} °C`;
+        const wind = `${day.day.maxwind_kph} kph`;
+        const humidity = `${day.day.avghumidity} %`;
+
+        const forecastCard = document.createElement("div");
+        forecastCard.classList.add("p-4", "bg-white", "rounded-md", "shadow-md", "flex", "items-center", "justify-between");
+
+        forecastCard.innerHTML = `
+          <div>
+            <p class="text-sm font-bold">${date}</p>
+            <p><img src="${icon}" alt="weather icon" class="inline-block h-8 w-8"></p>
+          </div>
+          <div>
+            <p class="text-sm">Temp: ${temp}</p>
+            <p class="text-sm">Wind: ${wind}</p>
+            <p class="text-sm">Humidity: ${humidity}</p>
+          </div>
+        `;
+
+        forecastContainer.appendChild(forecastCard);
+      });
+    }
+
+    function displayError(message) {
+      errorMessage.textContent = message;
+      errorMessage.classList.remove("hidden");
+      weatherInfo.classList.add("hidden");
+      forecastInfo.classList.add("hidden");
+    }
+
+    function saveRecentCity(city) {
+      let recentCities = JSON.parse(localStorage.getItem(RECENT_CITIES_KEY)) || [];
+      if (!recentCities.includes(city)) {
+        recentCities.push(city);
+        localStorage.setItem(RECENT_CITIES_KEY, JSON.stringify(recentCities));
+        updateRecentCitiesDropdown(recentCities);
+      }
+    }
+
+    function updateRecentCitiesDropdown(cities) {
+      recentCitiesDropdown.classList.toggle("hidden", cities.length === 0);
+      recentCitiesSelect.innerHTML = '<option value="">Select a city</option>';
+      cities.forEach(city => {
+        const option = document.createElement("option");
+        option.value = city;
+        option.textContent = city;
+        recentCitiesSelect.appendChild(option);
+      });
+    }
+
+    // Initialize dropdown with recent cities from localStorage
+    document.addEventListener("DOMContentLoaded", () => {
+      const savedCities = JSON.parse(localStorage.getItem(RECENT_CITIES_KEY)) || [];
+      updateRecentCitiesDropdown(savedCities);
+    });
+  </script>
+</body>
+</html>
